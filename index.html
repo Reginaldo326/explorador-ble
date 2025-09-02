@@ -4,6 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <title>Explorador BLE Interativo</title>
+  
+  
+  
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -65,9 +68,14 @@
       output.textContent = "🔍 Procurando dispositivo...";
 
       try {
+        if (!navigator.bluetooth) {
+          alert("Web Bluetooth não é suportado neste navegador!");
+          return;
+        }
+
         const device = await navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
-          optionalServices: [] 
+          optionalServices: []
         });
 
         output.textContent = `Conectando ao dispositivo: ${device.name || "Sem nome"}...`;
@@ -91,7 +99,6 @@
   - propriedades: ${Object.keys(char.properties).filter(p => char.properties[p]).join(", ")}`;
             serviceDiv.appendChild(charDiv);
 
-            // Botão Ler
             if (char.properties.read) {
               const readBtn = document.createElement("button");
               readBtn.textContent = "Ler valor";
@@ -103,7 +110,6 @@
               charDiv.appendChild(readBtn);
             }
 
-            // Campo + Botão Escrever
             if (char.properties.write || char.properties.writeWithoutResponse) {
               const input = document.createElement("input");
               input.placeholder = "Digite valor (texto)";
@@ -120,7 +126,6 @@
               charDiv.appendChild(writeBtn);
             }
 
-            // Botão Notificações
             if (char.properties.notify || char.properties.indicate) {
               const notifyBtn = document.createElement("button");
               notifyBtn.textContent = "Ativar Notificações";
@@ -132,7 +137,6 @@
                   char.addEventListener("characteristicvaluechanged", event => {
                     const value = event.target.value;
                     const decoder = new TextDecoder("utf-8");
-                    console.log(`Notificação ${char.uuid}:`, decoder.decode(value.buffer));
                     alert(`Notificação de ${char.uuid}: ${decoder.decode(value.buffer)}`);
                   });
                   notifyBtn.textContent = "Desativar Notificações";
