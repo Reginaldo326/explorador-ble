@@ -1,0 +1,157 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Explorador BLE Interativo</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f9;
+      padding: 20px;
+    }
+    h1 {
+      color: #333;
+    }
+    button {
+      padding: 6px 10px;
+      font-size: 14px;
+      margin: 4px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    input {
+      margin-left: 5px;
+      padding: 4px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    #output {
+      margin-top: 20px;
+      background: #fff;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      font-size: 14px;
+      white-space: pre-wrap;
+    }
+    .service {
+      margin: 10px 0;
+      padding: 10px;
+      border-left: 4px solid #007bff;
+      background: #f9f9ff;
+    }
+    .characteristic {
+      margin-left: 20px;
+      padding: 5px;
+      border-left: 3px dashed #999;
+    }
+  </style>
+</head>
+<body>
+  <h1>Explorador BLE Interativo</h1>
+  <button onclick="explorarBLE()">🔍 Conectar e Explorar</button>
+  <div id="output">Clique no botão para começar.</div>
+
+  <script>
+    async function explorarBLE() {
+      const output = document.getElementById("output");
+      output.textContent = "🔍 Procurando dispositivo...";
+
+      try {
+        const device = await navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: [] 
+        });
+
+        output.textContent = `Conectando ao dispositivo: ${device.name || "Sem nome"}...`;
+        const server = await device.gatt.connect();
+        const services = await server.getPrimaryServices();
+
+        output.innerHTML = `<h2>Serviços encontrados:</h2>`;
+
+        for (const service of services) {
+          const serviceDiv = document.createElement("div");
+          serviceDiv.className = "service";
+          serviceDiv.textContent = `Serviço: ${service.uuid}`;
+          output.appendChild(serviceDiv);
+
+          const characteristics = await service.getCharacteristics();
+
+          for (const char of characteristics) {
+            const charDiv = document.createElement("div");
+            charDiv.className = "characteristic";
+            charDiv.textContent = `Característica: ${char.uuid} 
+  - propriedades: ${Object.keys(char.properties).filter(p => char.properties[p]).join(", ")}`;
+            serviceDiv.appendChild(charDiv);
+
+            // Botão Ler
+            if (char.properties.read) {
+              const readBtn = document.createElement("button");
+              readBtn.textContent = "Ler valor";
+              readBtn.onclick = async () => {
+                const value = await char.readValue();
+                const decoder = new TextDecoder("utf-8");
+                alert(`Valor lido (${char.uuid}): ${decoder.decode(value.buffer)}`);
+              };
+              charDiv.appendChild(readBtn);
+            }
+
+            // Campo + Botão Escrever
+            if (char.properties.write || char.properties.writeWithoutResponse) {
+              const input = document.createElement("input");
+              input.placeholder = "Digite valor (texto)";
+              charDiv.appendChild(input);
+
+              const writeBtn = document.createElement("button");
+              writeBtn.textContent = "Escrever";
+              writeBtn.onclick = async () => {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(input.value);
+                await char.writeValue(data);
+                alert(`Escrito em ${char.uuid}: ${input.value}`);
+              };
+              charDiv.appendChild(writeBtn);
+            }
+
+            // Botão Notificações
+            if (char.properties.notify || char.properties.indicate) {
+              const notifyBtn = document.createElement("button");
+              notifyBtn.textContent = "Ativar Notificações";
+              let ativo = false;
+
+              notifyBtn.onclick = async () => {
+                if (!ativo) {
+                  await char.startNotifications();
+                  char.addEventListener("characteristicvaluechanged", event => {
+                    const value = event.target.value;
+                    const decoder = new TextDecoder("utf-8");
+                    console.log(`Notificação ${char.uuid}:`, decoder.decode(value.buffer));
+                    alert(`Notificação de ${char.uuid}: ${decoder.decode(value.buffer)}`);
+                  });
+                  notifyBtn.textContent = "Desativar Notificações";
+                  ativo = true;
+                } else {
+                  await char.stopNotifications();
+                  notifyBtn.textContent = "Ativar Notificações";
+                  ativo = false;
+                }
+              };
+              charDiv.appendChild(notifyBtn);
+            }
+          }
+        }
+      } catch (error) {
+        console.error(error);
+        output.textContent = "❌ Erro: " + error;
+      }
+    }
+  </script>
+</body>
+</html>
